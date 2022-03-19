@@ -1,3 +1,23 @@
+FROM ubuntu:20.04 AS volta-build
+
+RUN apt update -q \
+ && apt install -q -y build-essential curl libssl-dev \
+ && useradd -u 1000 -m runner
+
+USER 1000
+ENV HOME=/home/runner
+WORKDIR $HOME
+
+# install rust
+ENV PATH="$PATH:$HOME/.cargo/bin"
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+ARG VOLTA_VERSION=1.0.5
+ENV VOLTA_HOME="$HOME/.volta"
+RUN curl -sL https://github.com/volta-cli/volta/archive/refs/tags/v${VOLTA_VERSION}.tar.gz | tar xvz \
+ && cd volta-${VOLTA_VERSION} \
+ && ./dev/unix/volta-install.sh --release
+
 FROM summerwind/actions-runner:latest
 
 # install docker cli and google-chrome
@@ -28,16 +48,9 @@ ENV PATH="$PATH:$HOME/.cargo/bin"
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # build volta
-ARG VOLTA_VERSION=1.0.5
 ENV VOLTA_HOME="$HOME/.volta"
 ENV PATH="$PATH:$VOLTA_HOME/bin"
-RUN cd /tmp \
- && curl -sL https://github.com/volta-cli/volta/archive/refs/tags/v${VOLTA_VERSION}.tar.gz | tar xvz \
- && cd volta-${VOLTA_VERSION} \
- && sudo apt install -q -y libssl-dev pkg-config \
- && ./dev/unix/volta-install.sh --release \
- && cd / \
- && rm -rf /tmp/volta-${VOLTA_VERSION} $HOME/.cargo/registry/*
+COPY --from volta-build $VOLTA_HOME $VOLTA_HOME
  
 # install node
 RUN volta install node@16 && volta install yarn
