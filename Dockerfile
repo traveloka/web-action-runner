@@ -1,14 +1,34 @@
+FROM ubuntu:20.04 AS volta-build
+
+RUN apt update -q \
+ && apt install -q -y build-essential curl libssl-dev pkg-config \
+ && useradd -u 1000 -m runner
+
+USER 1000
+ENV HOME=/home/runner
+WORKDIR $HOME
+
+# install rust
+ENV PATH="$PATH:$HOME/.cargo/bin"
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+ARG VOLTA_VERSION=1.0.5
+ENV VOLTA_HOME="$HOME/.volta"
+RUN curl -sL https://github.com/volta-cli/volta/archive/refs/tags/v${VOLTA_VERSION}.tar.gz | tar xvz \
+ && cd volta-${VOLTA_VERSION} \
+ && ./dev/unix/volta-install.sh --release
+
 FROM summerwind/actions-runner:latest
 
 # install docker cli and google-chrome
 RUN true \
  && echo "deb https://download.docker.com/linux/ubuntu focal stable" | sudo tee /etc/apt/sources.list.d/docker.list \
- && echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list \
+ && echo 'deb http://download.opensuse.org/repositories/home:/ungoogled_chromium/Ubuntu_Focal/ /' | sudo tee /etc/apt/sources.list.d/home-ungoogled_chromium.list \
  && curl -sL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - \
- && curl -sL https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add - \
+ && curl -sL "https://download.opensuse.org/repositories/home:/ungoogled_chromium/Ubuntu_Focal/Release.key" | sudo apt-key add - \
  && sudo apt update -q \
  && sudo apt upgrade -q -y \
- && sudo apt install -q -y docker-ce-cli google-chrome-stable --no-install-recommends
+ && sudo apt install -q -y docker-ce-cli ungoogled-chromium --no-install-recommends
 
 # install aws cli
 RUN cd /tmp \
@@ -18,17 +38,22 @@ RUN cd /tmp \
  && rm -rf aws awscliv2.zip
 
 # install golang
-env PATH="$HOME/.gobrew/current/bin:$HOME/.gobrew/bin:$PATH"
+ARG GOLANG_VERSION=1.18
+ENV PATH="$PATH:$HOME/.gobrew/current/bin:$HOME/.gobrew/bin"
 RUN curl -sLk https://git.io/gobrew | sh - \
- && gobrew install 1.17
+ && gobrew install ${GOLANG_VERSION}
 
-# install volta
-env VOLTA_HOME="$HOME/.volta"
-env PATH="$PATH:$VOLTA_HOME/bin"
-RUN curl https://get.volta.sh | bash \
- && volta install node@16 \
- && volta install node@14 \
- && volta install yarn
+# install rust
+ENV PATH="$PATH:$HOME/.cargo/bin"
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+# build volta
+ENV VOLTA_HOME="$HOME/.volta"
+ENV PATH="$PATH:$VOLTA_HOME/bin"
+COPY --from=volta-build $VOLTA_HOME $VOLTA_HOME
+ 
+# install node
+RUN volta install node@16 && volta install yarn
 
 # ecr login
 RUN arch=$(test $(uname -m) = "aarch64" && echo arm64 || echo amd64) \
