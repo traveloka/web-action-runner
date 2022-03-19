@@ -34,6 +34,7 @@ ENV PATH="$PATH:$VOLTA_HOME/bin"
 RUN cd /tmp \
  && curl -sL https://github.com/volta-cli/volta/archive/refs/tags/v${VOLTA_VERSION}.tar.gz | tar xvz \
  && cd volta-${VOLTA_VERSION} \
+ && apt install -q -y libssl-dev pkg-config \
  && ./dev/unix/volta-install.sh --release \
  && cd / \
  && rm -rf /tmp/volta-${VOLTA_VERSION} $HOME/.cargo/registry/*
