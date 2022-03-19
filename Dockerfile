@@ -1,7 +1,7 @@
 FROM ubuntu:20.04 AS volta-build
 
 RUN apt update -q \
- && apt install -q -y build-essential curl libssl-dev \
+ && apt install -q -y build-essential curl libssl-dev pkg-config \
  && useradd -u 1000 -m runner
 
 USER 1000
