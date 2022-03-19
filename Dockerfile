@@ -50,7 +50,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 # build volta
 ENV VOLTA_HOME="$HOME/.volta"
 ENV PATH="$PATH:$VOLTA_HOME/bin"
-COPY --from volta-build $VOLTA_HOME $VOLTA_HOME
+COPY --from=volta-build $VOLTA_HOME $VOLTA_HOME
  
 # install node
 RUN volta install node@16 && volta install yarn
