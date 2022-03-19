@@ -18,20 +18,28 @@ RUN cd /tmp \
  && rm -rf aws awscliv2.zip
 
 # install golang
-env PATH="$HOME/.gobrew/current/bin:$HOME/.gobrew/bin:$PATH"
+ARG GOLANG_VERSION=1.18
+ENV PATH="$PATH:$HOME/.gobrew/current/bin:$HOME/.gobrew/bin"
 RUN curl -sLk https://git.io/gobrew | sh - \
- && gobrew install 1.17
+ && gobrew install ${GOLANG_VERSION}
 
 # install rust
+ENV PATH="$PATH:$HOME/.cargo/bin"
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-# install volta
-env VOLTA_HOME="$HOME/.volta"
-env PATH="$PATH:$VOLTA_HOME/bin"
-RUN curl https://get.volta.sh | bash \
- && volta install node@16 \
- && volta install node@14 \
- && volta install yarn
+# build volta
+ARG VOLTA_VERSION=1.0.5
+ENV VOLTA_HOME="$HOME/.volta"
+ENV PATH="$PATH:$VOLTA_HOME/bin"
+RUN cd /tmp \
+ && curl -sL https://github.com/volta-cli/volta/archive/refs/tags/v${VOLTA_VERSION}.tar.gz | tar xvz \
+ && cd volta-${VOLTA_VERSION} \
+ && ./dev/unix/volta-install.sh --release \
+ && cd / \
+ && rm -rf /tmp/volta-${VOLTA_VERSION} $HOME/.cargo/registry/*
+ 
+# install node
+RUN volta install node@16 && volta install yarn
 
 # ecr login
 RUN arch=$(test $(uname -m) = "aarch64" && echo arm64 || echo amd64) \
