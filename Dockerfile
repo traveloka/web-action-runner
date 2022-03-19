@@ -3,7 +3,7 @@ FROM summerwind/actions-runner:latest
 # install docker cli and google-chrome
 RUN true \
  && echo "deb https://download.docker.com/linux/ubuntu focal stable" | sudo tee /etc/apt/sources.list.d/docker.list \
- && echo echo 'deb http://download.opensuse.org/repositories/home:/ungoogled_chromium/Ubuntu_Focal/ /' | sudo tee /etc/apt/sources.list.d/home-ungoogled_chromium.list \
+ && echo 'deb http://download.opensuse.org/repositories/home:/ungoogled_chromium/Ubuntu_Focal/ /' | sudo tee /etc/apt/sources.list.d/home-ungoogled_chromium.list \
  && curl -sL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - \
  && curl -sL "https://download.opensuse.org/repositories/home:/ungoogled_chromium/Ubuntu_Focal/Release.key" | sudo apt-key add - \
  && sudo apt update -q \
@@ -21,6 +21,9 @@ RUN cd /tmp \
 env PATH="$HOME/.gobrew/current/bin:$HOME/.gobrew/bin:$PATH"
 RUN curl -sLk https://git.io/gobrew | sh - \
  && gobrew install 1.17
+
+# install rust
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # install volta
 env VOLTA_HOME="$HOME/.volta"
