@@ -1,4 +1,32 @@
-FROM summerwind/actions-runner:latest
+FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
+FROM --platform=$BUILDPLATFORM ubuntu:focal AS volta
+COPY --link --from=xx / /
+
+RUN apt-get update -q \
+ && apt-get install -y -q curl clang lld \
+ && curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path --profile minimal
+ENV PATH=$PATH:/root/.cargo/bin/
+
+ARG VOLTA_VERSION=1.0.8
+RUN curl -sL https://github.com/volta-cli/volta/archive/refs/tags/v${VOLTA_VERSION}.tar.gz | tar -xz \
+ && cd volta-${VOLTA_VERSION} \
+ && cargo fetch
+
+ARG TARGETPLATFORM
+RUN rustup target add $(xx-info march)-unknown-linux-gnu \
+ && xx-clang --setup-target-triple \
+ && DEBIAN_FRONTEND=noninteractive xx-apt-get install -y pkg-config libssl-dev libc6-dev
+
+RUN cd volta-${VOLTA_VERSION} \
+ && export CARGO_TARGET_$(xx-info march | tr '[:lower:]' '[:upper:]')_UNKNOWN_LINUX_GNU_LINKER=$(xx-info)-clang \
+ && export CARGO_TARGET_$(xx-info march | tr '[:lower:]' '[:upper:]')_UNKNOWN_LINU_GNU_RUSTFLAGS="" \
+ && export CC_$(xx-info march)_unknown_linux_gnu=$(xx-info)-clang \
+ && PKG_CONFIG_ALLOW_CROSS=1 cargo build --release --target $(xx-info march)-unknown-linux-gnu \
+ && mkdir /.volta \
+ && ls target/ \
+ && mv target/release/$(xx-info march)-unknown-linux-gnu/* /.volta
+
+FROM summerwind/actions-runner:latest as main
 
 # install docker cli and google-chrome
 RUN true \
@@ -8,7 +36,7 @@ RUN true \
  && curl -sL https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add - \
  && sudo apt update -q \
  && sudo apt upgrade -q -y \
- && sudo apt install -q -y docker-ce-cli google-chrome-stable --no-install-recommends
+ && sudo apt install -q -y docker-ce-cli --no-install-recommends
 
 # install aws cli
 RUN cd /tmp \
@@ -25,10 +53,8 @@ RUN curl -sLk https://git.io/gobrew | sh - \
 # install volta
 env VOLTA_HOME="$HOME/.volta"
 env PATH="$PATH:$VOLTA_HOME/bin"
-RUN curl https://get.volta.sh | bash \
- && volta install node@16 \
- && volta install node@14 \
- && volta install yarn
+COPY --from=volta --chown=1000:1000 /.volta /home/runner/.volta
+RUN volta install node@16 && volta install yarn
 
 # ecr login
 RUN arch=$(test $(uname -m) = "aarch64" && echo arm64 || echo amd64) \
@@ -39,3 +65,8 @@ RUN arch=$(test $(uname -m) = "aarch64" && echo arm64 || echo amd64) \
 
 # update PATH
 RUN sudo sed -i "/^PATH=/c\PATH=$PATH" /etc/environment
+
+
+## Perftest Image
+FROM main as perftest
+RUN sudo apt install -q -y google-chrome-stable --no-install-recommends
